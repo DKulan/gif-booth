@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import download from 'downloadjs'
 import { Link } from 'react-router-dom'
 import './Create.css'
-import AsyncSelect from 'react-select/lib/Async'
+import Select from 'react-select'
 import Webcam from '../../components/WebcamCapture'
 import Countdown from '../../components/Countdown'
 import Page from '../../components/Page'
@@ -33,28 +33,53 @@ function Create({ history }) {
   const [warning, setWarning] = useState(
     window.MediaRecorder ? false : WARNING_BROWSER,
   )
+  const [webCamDenied, setWebCamDenied] = useState(true)
+  const [webCamSelectPlaceHolder, setWebCamSelectPlaceHolder] = useState(
+    'Please accept browser webcam permissions',
+  )
+  const [webCamOptions, setWebCamOptions] = useState([])
 
-  const cameraOptions = () =>
+  useEffect(() => {
     navigator.mediaDevices
-      .enumerateDevices()
-      .then((inputs) => {
-        const options = []
-        inputs
-          .filter((input) => {
-            return input.kind === 'videoinput'
+      .getUserMedia({
+        audio: false,
+        video: true,
+      })
+      .then(() => {
+        navigator.mediaDevices
+          .enumerateDevices()
+          .then((inputs) => {
+            const options = []
+            inputs
+              .filter((input) => {
+                return input.kind === 'videoinput'
+              })
+              .forEach((videoInput) => {
+                options.push({
+                  value: videoInput,
+                  label: videoInput.label,
+                })
+              })
+
+            if (options.length < 1) {
+              setWebCamSelectPlaceHolder('No camera detected...')
+              setWebCamDenied(true)
+            } else {
+              setWebCamDenied(false)
+              setWebCamSelectPlaceHolder('Select your camera...')
+              setWebCamOptions(options)
+            }
           })
-          .forEach((videoInput) => {
-            options.push({
-              value: videoInput,
-              label: videoInput.label,
-            })
+          .catch((err) => {
+            console.error('ERROR: No camera input found', err)
           })
-        return options
       })
       .catch((err) => {
-        console.error('ERROR: No camera input found', err)
-        return []
+        console.error(err)
+        setWebCamSelectPlaceHolder('You have denied webcam permissions')
+        setWebCamDenied(true)
       })
+  }, [])
 
   const retry = () => {
     setGifId(null)
@@ -198,15 +223,11 @@ function Create({ history }) {
             )}
           </div>
           <div className="container">
-            <AsyncSelect
-              cacheOptions
-              defaultOptions
-              placeholder="Select your camera..."
+            <Select
+              isDisabled={webCamDenied}
+              placeholder={webCamSelectPlaceHolder}
+              options={webCamOptions}
               onChange={setRecordingInput}
-              noOptionsMessage={() => {
-                return 'No camera detected...'
-              }}
-              loadOptions={cameraOptions}
             />
           </div>
           {isPrerecordingPhase && (
